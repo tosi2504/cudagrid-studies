@@ -1,5 +1,8 @@
 #pragma once
 
+#include <assert.h>
+#include "cudatools.h"
+
 namespace copy {
     template<class T>
     __global__ void naive(T * d_out, const T * d_in, unsigned N) {
@@ -15,7 +18,6 @@ namespace copy {
         return sizeof(T) * (long)2*N*N * (long)reps / (double)micros;
     }
 }
-
 
 namespace transpose {
     template<class T>
@@ -65,3 +67,89 @@ namespace transpose {
     }
 }
 
+namespace repeatedMatmul {
+    template<class T, unsigned N>
+    __global__ void naive(T * d_Ys, const T * d_As, const T * d_Xs, unsigned iterations = 1) {
+        const unsigned N_ceil32 = CEIL(N, 32);
+        const unsigned numThreads = blockDim.x;
+        assert(numThreads >= N_ceil32);
+
+        const unsigned iMatrix = blockIdx.x;
+        
+        // shift to correct matrix in batch
+        const T * A = d_As + N*N*iMatrix;
+        const T * X = d_Xs + N*N*iMatrix;
+        T * Y = d_Ys + N*N*iMatrix;
+
+        //shmem (everything row major?)
+        extern __shared__ T shmem[];
+        T * sA = shmem;
+        T * sX = shmem + N*N;
+        // T * sY = shmem + N*N + N*N;
+
+        // fill sA and sX
+        for (unsigned i = threadIdx.x; i < N*N; i+=numThreads) {
+            const unsigned col = i % N;
+            const unsigned row = i / N;
+            sA[i] = A[row*N + col];
+            sX[i] = X[row*N + col];
+        }
+        __syncthreads();
+
+        const unsigned rowStride = numThreads / N_ceil32;
+        const unsigned dRow = threadIdx.x / N_ceil32;
+        const unsigned iCol = threadIdx.x % N_ceil32;
+        if (iCol >= N) return; // access guard
+        for (unsigned iiRow = 0; iiRow < N; iiRow+=rowStride) {
+            const unsigned iRow = iiRow + dRow;
+            if (iRow >= N) return; // access guard
+        
+            T dotRes = 0;
+            for (unsigned k = 0; k < N; k++) {
+                dotRes += sA[iRow*N + k] * sX[k*N + iCol];
+            }
+            Y[iRow*N + iCol] = dotRes;
+        }
+    }
+
+    template<class T, unsigned N>
+    constexpr unsigned calcShmemSize() {
+        return sizeof(T) * N*N * 2;
+    }
+
+    template<class T, unsigned N>
+    double calcBW(unsigned numMatrices, unsigned reps, unsigned long micros, unsigned iterations = 1) {
+        return sizeof(T) * (long)reps * (long)(3*N*N) * (long)(numMatrices) / (double)micros;
+    }
+
+    template<class T, unsigned N>
+    void test(
+        const MatrixBatch<T,N> & Ys, 
+        const MatrixBatch<T,N> & As, 
+        const MatrixBatch<T,N> & Xs
+    ) {
+        const unsigned numMatrices = Ys.numMatrices;
+        assert(numMatrices == Xs.numMatrices);
+        assert(numMatrices == As.numMatrices);
+        for (unsigned iMatrix = 0; iMatrix < numMatrices; iMatrix++) {
+            T * A = As.h_data + iMatrix*N*N;
+            T * X = Xs.h_data + iMatrix*N*N;
+            T * Y = Ys.h_data + iMatrix*N*N;
+            for (unsigned row = 0; row < N; row++) {
+                for (unsigned col = 0; col < N; col++) {
+                    T tempRes = 0;
+                    for (unsigned k = 0; k < N; k++) {
+                        tempRes += A[row*N + k] * X[k*N + col];
+                    }
+                    if (not isEqual(Y[row*N + col], tempRes)) {
+                        std::cout << "Test: Mismatch at iMatrix: " << iMatrix;
+                        std::cout << ", row: " << row << ", col:" << col;
+                        std::cout << "  --> You suck! *look of disgust and distain*" << std::endl;
+                        return;
+                    }
+                }
+            }
+        }
+        std::cout << "Test: All tests successful, no mismatches! *smirk* *blows kiss*" << std::endl;
+    }
+}

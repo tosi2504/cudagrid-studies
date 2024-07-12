@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <random>
 #include <type_traits>
 
 template<class T>
@@ -21,6 +22,12 @@ struct __align__(2*sizeof(T)) complex {
     __host__ __device__ inline
     complex(const complex<T> & other):
         real(other.real), imag(other.imag) {}
+    __host__ __device__ inline
+    complex<T> & operator = (const complex<T> & other) {
+        real = other.real;
+        imag = other.imag;
+        return *this;
+    }
     __host__ __device__ inline
     void operator += (const complex<T> & right) {
         real += right.real;
@@ -78,4 +85,36 @@ template<> bool isEqual(const realD & a, const realD & b) { return std::abs(a-b)
 template<> bool isEqual(const complexF & a, const complexF & b) { return (a-b).norm2() < 0.01; }
 template<> bool isEqual(const complexD & a, const complexD & b) { return (a-b).norm2() < 0.01; }
 
-
+template<class T> struct uniform_distribution;
+template<> struct uniform_distribution<realF> {
+    std::uniform_real_distribution<realF> dist;
+    uniform_distribution(realF min, realF max):
+        dist(std::uniform_real_distribution<realF>(min, max))
+    {}
+    template<class Gen>
+    realF operator () (Gen & gen) {
+        return dist(gen);
+    }
+};
+template<> struct uniform_distribution<realD> {
+    std::uniform_real_distribution<realD> dist;
+    uniform_distribution(realD min, realD max):
+        dist(std::uniform_real_distribution<realD>(min, max))
+    {}
+    template<class Gen>
+    realD operator () (Gen & gen) {
+        return dist(gen);
+    }
+};
+template<class T> struct uniform_distribution<complex<T>> {
+    std::uniform_real_distribution<T> dist_real;
+    std::uniform_real_distribution<T> dist_imag;
+    uniform_distribution(const complex<T> & min, const complex<T> & max):
+        dist_real(std::uniform_real_distribution<T>(min.real, max.real)),
+        dist_imag(std::uniform_real_distribution<T>(min.imag, max.imag))
+    {}
+    template<class Gen>
+    complex<T> operator () (Gen & gen) {
+        return complex<T>(dist_real(gen), dist_imag(gen));
+    }
+};

@@ -73,6 +73,7 @@ ret;
 PTX is actually not that hard to understand, at least for such a simple kernel.
 If one does this for complex numbers, the global loads and stores are vectorized (i.e. get a .v2 modifier).
 
+
 ## Transpose kernel
 Okay let's get a bit more involved.
 Here we will write two kernels:
@@ -84,10 +85,54 @@ I am looking forward to it.
 ### Naive version
 Performs horrible for both complex and real numbers (as expected).
 Reaches only about a tenth of the max bandwidth.
+Note: On my big machine it was 33%!
 
 ### Shared memory
 Okay so the idea is simple:
 Load a tile into shared memory and then write it back out.
 Both the load and the store can be done as coalesced gmem access, but somehow that did not work at all!
 Again, I reached only about a tenth of the max bandwidth.
-So wtf is going on here???
+Okay, so on my big machine it works, i.e., we git about 85% of bandwidth with the shmem kernel. 
+This means I just simply cannot trust my notebook, when not plugged into power.
+Now let's try with complex numbers -> Again, no performance issues (we get 90%).
+It should be noted, that the pressure on shared memory is low.
+We only have one access per gmem element.
+This is hard to compare with matmul operations.
+However, we have won some important insight:
+Gmem to shmem works very well, independently of complex and real numbers.
+
+
+## Matmul: High arithmetic density
+So far we have looked into memory-heavy operations and found that the switch from real to complex numbers has no implications on optimal code.
+Now, I want to do something a bit compute-heavier.
+So, here is the idea:
+Load small matrices into shmem (1 matrix per block) and perform some kind of matmul on those.
+We can crank up the arithmetic density by repeating that operation multiple times.
+For now, we just do it once.
+As inputs we should have an input field and an output field.
+Those should be continuous in memory? -> Does not matter actually.
+Should we do the full blocktiling stuff?
+Let's not do this now, but instead add it gradually.
+Problem: We need to stride through the result matrix somehow.
+Solved.
+Let's write some test code and a main file.
+Alright, test routine is also written ... let's write the main file.
+Main file has been written and kernel has been debugged.
+The performance results are very interesting!
+TODO: 
+- check performance for realF and complexF and try to interpret
+- implement the interations loop to play with arithmetic density
+- this is gonna be good
+
+
+
+
+
+
+
+
+
+
+
+
+
