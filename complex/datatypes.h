@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <random>
 #include <type_traits>
+#include <string>
 
 template<class T>
 struct __align__(2*sizeof(T)) complex {
@@ -118,3 +119,9 @@ template<class T> struct uniform_distribution<complex<T>> {
         return complex<T>(dist_real(gen), dist_imag(gen));
     }
 };
+
+template<class T> struct typeAsString;
+template<> struct typeAsString<realF> { static constexpr char value[] = "realF"; };
+template<> struct typeAsString<realD> { static constexpr char value[] = "realD"; };
+template<> struct typeAsString<complexF> { static constexpr char value[] = "complexF"; };
+template<> struct typeAsString<complexD> { static constexpr char value[] = "complexD"; };

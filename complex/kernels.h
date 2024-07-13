@@ -68,8 +68,8 @@ namespace transpose {
 }
 
 namespace repeatedMatmul {
-    template<class T, unsigned N>
-    __global__ void naive(T * d_Ys, const T * d_As, const T * d_Xs, unsigned iterations = 1) {
+    template<class T, unsigned N, unsigned iterations>
+    __global__ void naive(T * d_Ys, const T * d_As, const T * d_Xs) {
         const unsigned N_ceil32 = CEIL(N, 32);
         const unsigned numThreads = blockDim.x;
         assert(numThreads >= N_ceil32);
@@ -96,19 +96,22 @@ namespace repeatedMatmul {
         }
         __syncthreads();
 
-        const unsigned rowStride = numThreads / N_ceil32;
-        const unsigned dRow = threadIdx.x / N_ceil32;
-        const unsigned iCol = threadIdx.x % N_ceil32;
-        if (iCol >= N) return; // access guard
-        for (unsigned iiRow = 0; iiRow < N; iiRow+=rowStride) {
-            const unsigned iRow = iiRow + dRow;
-            if (iRow >= N) return; // access guard
-        
-            T dotRes = 0;
-            for (unsigned k = 0; k < N; k++) {
-                dotRes += sA[iRow*N + k] * sX[k*N + iCol];
+        // iterations loop
+        for (unsigned _ = 0; _ < iterations; _++) {
+            const unsigned rowStride = numThreads / N_ceil32;
+            const unsigned dRow = threadIdx.x / N_ceil32;
+            const unsigned iCol = threadIdx.x % N_ceil32;
+            if (iCol >= N) return; // access guard
+            for (unsigned iiRow = 0; iiRow < N; iiRow+=rowStride) {
+                const unsigned iRow = iiRow + dRow;
+                if (iRow >= N) break; // access guard
+            
+                T dotRes = 0;
+                for (unsigned k = 0; k < N; k++) {
+                    dotRes += sA[iRow*N + k] * sX[k*N + iCol];
+                }
+                Y[iRow*N + iCol] = dotRes;
             }
-            Y[iRow*N + iCol] = dotRes;
         }
     }
 
@@ -118,7 +121,7 @@ namespace repeatedMatmul {
     }
 
     template<class T, unsigned N>
-    double calcBW(unsigned numMatrices, unsigned reps, unsigned long micros, unsigned iterations = 1) {
+    double calcBW(unsigned numMatrices, unsigned reps, unsigned long micros) {
         return sizeof(T) * (long)reps * (long)(3*N*N) * (long)(numMatrices) / (double)micros;
     }
 

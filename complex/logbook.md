@@ -121,10 +121,80 @@ Main file has been written and kernel has been debugged.
 The performance results are very interesting!
 TODO: 
 - check performance for realF and complexF and try to interpret
-- implement the interations loop to play with arithmetic density
+- implement the iterations loop to play with arithmetic density
 - this is gonna be good
 
+### Performance for iterations = 1
+Alright, results are in and very interesting:
+For 
+```
+    T           : {realF, complexF}
+    N           : 32
+    numMatrices : 2000
+    numThreads  : 256
+    reps        : 100
+    shmem(bytes): 16384
+```
+we get respectively:
+- realF: 250 GB/s
+- complexF: 342 GB/s
 
+What do we learn from this?
+For small matrices the arithmetic density is so low that the bottleneck is the actual gmem loads and stores.
+It is surprising though that the bandwidth for complex numbers is higher than for real numbers.
+I suspect, that has something to do with vectorized gmem access, but that will require further investigation.
+Let's do some profiling.
+- real numbers:
+    - we already run into MIO Throttle Stalls, most likely due to lower arithmetic density (2 shmemloads(4byte): 2 flop -> 1 flop per 4 byte)
+    - only 8% of fp32 performance
+    - i.e. we are effectively being stalled by doing shmem loads
+- complex numbers:
+    - not MIO Throttle Stalls yet, most likely bc arithmetic density per shmem load is high (2 shmemloads(8byte): 8 flop -> 1 flop per 2 byte)
+    - 23% of fp32 performance
+What I do not get, is how the gmem bandwidth is positively correlated to higher arithmetic density.
+The ratio of shmem loads to gmem loads is the same for both number types.
+The solution is probably vectorized accesses, which a quick look into PTX verifies.
+I am surprised though, that that makes such a difference.
+Well, lets keep it in mind.
+
+### Performance for iterations > 1
+Very interesting results!
+I thought that the bandwidth of real numbers will surpass that of complex numbers.
+But interestingly the ratio stays roughly 2:3 ... wtf.
+Also the usage of fp32 instructions hasn't changed much (it got slightly higher).
+So maybe it is really the shmem accesses that dominate.
+This would be backed up by the (now much higher ... even for complex numbers) Stall MIO Throttle values.
+I am not completely sure what to make of this.
+
+#### Vectorized shmem access during the dot product
+I want to have a look at the vectorization of the shmem accesses.
+SUPER INTERESTING:
+Let's introduce a new metric: shmem load calls per loaded bytes.
+This is a metric that measures the magnitude of vectorization at hand.
+For both real and complex numbers the k loop is unrolled.
+Real numbers: 
+So, for real numbers for 4 results we have one vectorized load from A (ld.shared.v4.f32) and then 4 loads from X (4 x ld.shared.f32).
+This is in total 5 calls per 8 * 4bytes = 5 calls / 32 bytes.
+For complex numbers for 2 results we have one vectorized load from A (ld.shared.v4.f32) and 2 vectorized loads from X (2 x ld.shared.v2.f32).
+This is in total 3 calls per 8 * 4bytes = 3 calls / 32 bytes.
+THIS IS THE ANSWER TO THE 2:3 problem!!!!
+If my theory is correct, this ratio should hold for higher N.
+Let's try N = 64 now.
+Aaaaaand it holds perfectly (1054 : 1527)!
+I just won so much understanding lol.
+
+#### Vectorized gmem accesses
+One more thing I want to understand, is how much effect the vectorized gmem access have.
+The real kernel does not have vectorized gmem accesses, while the complex kernel does.
+Whatever.
+
+
+TODO:
+- vectorize the X loads by making X column major (duh!)
+- think about what can be done to use FMA for complex numbers:
+    - note that the PTX code for real numbers uses FMA while the one for complex numbers does not
+- think about how to implement blocktiling with this new knowledge and also run blocktiling to check the performance impact
+- make gmem loads dominant to understand the impact of vectorized gmem accesses (though the impact is probably small)
 
 
 
