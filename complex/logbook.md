@@ -235,7 +235,11 @@ Further improvement for N=64, complex, tilewidth=1, tileheight=2, tileRowStride=
 313000 MB/s !!!!!!!!!!!!!!!!!!!!!!
 
 Note however, that for N=32 we already have very good complex performance with just blocktiling.
-This can be very nicely reproduced with the new kernel, though.
+This can be nicely reproduced with the new kernel, though (tilewidth = 2, tileColStride = 16).
+
+TODOs:
+- put new kernel (repeatingMatmul::conflicting) through some more careful profiling (nsight-compute).
+- carry the findings over to the stencil :)
 
 
 
