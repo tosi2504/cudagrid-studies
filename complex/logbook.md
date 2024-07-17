@@ -234,6 +234,9 @@ We are in fact getting there.
 Further improvement for N=64, complex, tilewidth=1, tileheight=2, tileRowStride=32, tileColStride=32 (i.e. 2 conflicts):
 313000 MB/s !!!!!!!!!!!!!!!!!!!!!!
 
+Note however, that for N=32 we already have very good complex performance with just blocktiling.
+This can be very nicely reproduced with the new kernel, though.
+
 
 
 
