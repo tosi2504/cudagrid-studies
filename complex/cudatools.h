@@ -34,3 +34,4 @@ void checkLast(const char* const file, const int line)
 
 #define CEIL_DIV(a, b) ((a + b - 1) / b)
 #define CEIL(a, quant) (((a+quant-1)/quant) * quant)
+#define FLOOR(a, quant) (((a) / (quant)) * (quant))

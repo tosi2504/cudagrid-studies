@@ -183,22 +183,56 @@ Let's try N = 64 now.
 Aaaaaand it holds perfectly (1054 : 1527)!
 I just won so much understanding lol.
 
+##### Vectorising X accesses
+Vectorizing sX accesses can be easily done by making sX column major.
+This indeed makes the sX accesses vectorized.
+Interestingly the performance greatly degrades.
+This is due to memory bank conflicts.
+Avoiding these by k = (_k + threadIdx.x) % N restores performance but removes vectorization.
+Let's try to unroll/vectorize the k loop explicitly.
+This was not beneficial for performance!
+The vectorized sA accesses are great, bc they can be broadcasted as well.
+This is not the case for the vectorized sX accesses.
+This leads so huuuuge MIO throttle stalls.
+
 #### Vectorized gmem accesses
 One more thing I want to understand, is how much effect the vectorized gmem access have.
 The real kernel does not have vectorized gmem accesses, while the complex kernel does.
 Whatever.
 
+#### Fused multiply add instructions
+The complex kernel does not use FMA instructions.
+I think this can be solved rather easily though, with the following code:
+```
+tempR = fmsub(AR, XR, fmsub(AI, XI, tempR[i]));
+tempI[i] = fmadd(AR, XI, fmadd(XR, AI, tempI[i]));
+```
+We could use the CUDA intrinsics functions.
+This actually improved performance by like 25% -> NICE!
 
-TODO:
-- vectorize the X loads by making X column major (duh!)
-- think about what can be done to use FMA for complex numbers:
-    - note that the PTX code for real numbers uses FMA while the one for complex numbers does not
-- think about how to implement blocktiling with this new knowledge and also run blocktiling to check the performance impact
-- make gmem loads dominant to understand the impact of vectorized gmem accesses (though the impact is probably small)
 
+#### Controlling memory bank conflicts
+So here is the theory:
+For 'N=64' complex performs significantly worse than real.
+The reason is that one row is distributed over 4 memory bank stacks (1 stack = 32x4 bytes).
+This means there are 4 memory bank conflicts per load!
+For real numbers its only 2 stacks, which seems to be fine.
+Note that the following rows in Y are not a problem bc they lead to broadcasts in X loads.
+So in a way we are trying to maximize the number of broadcasts.
 
+What do we do about it?
+Okay, so here is what I have done:
+Introduced new template parameters tileRowStride and tileColStride.
+Then the numThreads must be tileRowStride * tileColStride!
+The number of conflicts is (tileColStride * tilewidth {* 2 for complex and * 1 for real}) / 32.
 
+Here are the results for N=64, complex, tilewidth=tileheight=2, tileRowStride=32, tileColStride=16 (i.e. 2 conflicts):
+300000 MB/s !!!!!!!!!!!!!!!!!!!!!!
+That is another big improvement!
+We are in fact getting there.
 
+Further improvement for N=64, complex, tilewidth=1, tileheight=2, tileRowStride=32, tileColStride=32 (i.e. 2 conflicts):
+313000 MB/s !!!!!!!!!!!!!!!!!!!!!!
 
 
 
