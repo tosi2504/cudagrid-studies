@@ -210,7 +210,6 @@ tempI[i] = fmadd(AR, XI, fmadd(XR, AI, tempI[i]));
 We could use the CUDA intrinsics functions.
 This actually improved performance by like 25% -> NICE!
 
-
 #### Controlling memory bank conflicts
 So here is the theory:
 For 'N=64' complex performs significantly worse than real.
@@ -237,8 +236,62 @@ Further improvement for N=64, complex, tilewidth=1, tileheight=2, tileRowStride=
 Note however, that for N=32 we already have very good complex performance with just blocktiling.
 This can be nicely reproduced with the new kernel, though (tilewidth = 2, tileColStride = 16).
 
+
+WARNING:
+I was not completely correct about how shmem works.
+Let's go through the new understanding.
+First, they only happen on a in-warp basis.
+Secondly, bank conflicts happen in transactions.
+Transactions are grouped shmem operations, where the threads in one transaction are contiguous. 
+Transactions are never more than 128 bytes (32 banks x 4 bytes). 
+Lets make an example.
+32 threads load 64 complex numbers (128 f32's), i.e., one thread loads a float4 basically.
+Then this will lead to quarter warp transactions, i.e., transactions with 8 threads. 
+This transaction will load 128 bytes for 8 threads.
+4 transactions will happen and no memory bank conflicts occur!
+
+Even further improvements:
+Further improvement for N=64, complex, tilewidth=2, tileheight=2, tileRowStride=32, tileColStride=32:
+340 GB/s !!!!!!!!
+This proves that occupancy IS important for complex numbers.
+Using 1024 threads per block does improve performance!
+
+
+
+#### Calculating some properties
+Alright what can we calculate:
+- gmem loads
+- shmem loads
+- shmem loads per gmem loads
+- arithmetic intensities:
+    - flop / gmem loads (in our case the mathematical limit of arithmetic intensity)
+    - flop / shmem loads
+
+##### repeatedMatmul::conflicting
+All calculations are on a per block basis.
+- gmem accesses: 3 * N * N
+- shmem accesses: 
+    - stores: 2 * N * N
+    - loads per result: (tilewidth + tileheight) * N / (tilewidth * tileheight)
+- arithmetic operations per result:
+    - real: 2*N
+    - comp: 8*N
+- arithmetic operations per shmem load
+    - real: 2 * tilewidth * tileheight / (tilewidth + tileheight)
+    - real: 8 * tilewidth * tileheight / (tilewidth + tileheight)
+- arithmetic operations per gmem load
+    - real: 2 * N * N * N / (3 * N * N) = 2/3 N
+    - comp: 8/3 N
+
+
+
+
+
+
+
 TODOs:
 - put new kernel (repeatingMatmul::conflicting) through some more careful profiling (nsight-compute).
+- calculate arithmetic intensities and what not in order to understand even better, whats happening.
 - carry the findings over to the stencil :)
 
 

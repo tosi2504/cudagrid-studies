@@ -14,7 +14,7 @@ constexpr unsigned reps = 100;
 // auto kernel = repeatedMatmul::naive<T,N,iterations>;
 // auto kernel = repeatedMatmul::vectorizedShmem<T,N,iterations>;
 // auto kernel = repeatedMatmul::blocktiling<T,N,iterations,4,2>;
-auto kernel = repeatedMatmul::conflicting<T,N,iterations,2,1,32,32>;
+auto kernel = repeatedMatmul::conflicting<T,N,iterations,2,2,32,32>;
 
 int main () {
     // print information of run
