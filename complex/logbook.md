@@ -252,7 +252,7 @@ This transaction will load 128 bytes for 8 threads.
 
 Even further improvements:
 Further improvement for N=64, complex, tilewidth=2, tileheight=2, tileRowStride=32, tileColStride=32:
-340 GB/s !!!!!!!!
+340 GB/s !!!!!!!! -> Nice
 This proves that occupancy IS important for complex numbers.
 Using 1024 threads per block does improve performance!
 
@@ -290,8 +290,6 @@ All calculations are on a per block basis.
 
 
 TODOs:
-- put new kernel (repeatingMatmul::conflicting) through some more careful profiling (nsight-compute).
-- calculate arithmetic intensities and what not in order to understand even better, whats happening.
 - carry the findings over to the stencil :)
 
 
