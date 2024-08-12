@@ -1,20 +1,13 @@
 # TODO
-Whatever
+
+Understand:
+    - grid->oSites()
+    - autoView
+    - coalescedRead
+    - coalescedReadPermute
+    - coalescedWrite
 
 # Grid optimisations
-
-## Tests for learning
-
-I create some file for the parts of Grid I need to understand.
-For every file I have a list of classes/functions I want to probe.
-
-### SIMD
-So which classes/functions do I want to test?
-- Simd.h
-    - ComplexF (from thrust::complex<RealF>)
-
-
-
 
 ## Grid benchmark
 
@@ -28,30 +21,84 @@ g++ main.cpp -o out -I/home/tobias/phd/Grid/build/Grid -O3 -fno-strict-aliasing 
 Interestingly, if I compile with clang I get: "Fatal error: 'omp.h' file not found".
 But it works with gcc.
 
-#### For a single GPU:
+#### For single GPU
 
 The configure command I use is:
 ../configure --enable-comms=none --enable-accelerator=cuda CXX=nvcc --enable-simd=GPU
 
-The summary can be found in build/grid.configure.summary.
-Note: On my fedora workstation, -lfftw3f and -lfftw3 are not required.
-But we additionally need -lmpfr and -lgmp
+The summary is:
+
+```
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Summary of configuration for Grid v0.7.0
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----- GIT VERSION -------------------------------------
+commit: 8a098889
+branch: develop
+date  : 2024-04-30
+----- PLATFORM ----------------------------------------
+architecture (build)        : x86_64
+os (build)                  : linux-gnu
+architecture (target)       : x86_64
+os (target)                 : linux-gnu
+compiler vendor             : gnu
+compiler version            : 
+----- BUILD OPTIONS -----------------------------------
+Nc                          : 3
+SIMD                        : GPU (width= 64)
+Threading                   : yes
+Acceleration                : cuda
+Unified virtual memory      : yes
+Communications type         : none
+Shared memory allocator     : no
+Shared memory mmap path     : /var/lib/hugetlbfs/global/pagesize-2MB/
+Default precision           : 
+Software FP16 conversion    : yes
+RNG choice                  : sitmo
+GMP                         : no
+LAPACK                      : no
+FFTW                        : yes
+LIME (ILDG support)         : no
+HDF5                        : no
+build DOXYGEN documentation : no
+Sp2n                        : no
+----- BUILD FLAGS -------------------------------------
+CXXFLAGS:
+    -I/home/tobias/phd/Grid
+    -O3
+    -Xcompiler
+    -fno-strict-aliasing
+    --expt-extended-lambda
+    --expt-relaxed-constexpr
+    -Xcompiler
+    -fopenmp
+LDFLAGS:
+    -L/home/tobias/phd/Grid/build/Grid
+    -Xcompiler
+    -fopenmp
+LIBS:
+    -lz
+    -lcrypto
+    -lfftw3f
+    -lfftw3
+    -lstdc++
+    -lm
+    -lcuda
+    -lz
+-------------------------------------------------------
+```
 
 The install can be made with (cuda was not installed globally):
+
 ```
 sudo env PATH=PATH="/usr/local/cuda-12.3/bin:$PATH" LD_LIBRARY_PATH="/usr/local/cuda-12.3/lib64:$LD_LIBRARY_PATH" make install -j 6
 ```
 
 Compilation of the main.cu be done with:
+
 ```
 nvcc test-accelerator-for.cu -o out -O3 -l:libGrid.a -Xcompiler -fno-strict-aliasing -Xcompiler -fopenmp --expt-relaxed-constexpr --expt-extended-lambda
 ```
-
-#### Meson 
-The whole shebang can be done with meson.
-Note that on fedora I had to $ sudo dnf install mpfr-devel (which also installs gmp-devel)
-The grid dependency can be added by meson.get_compiler('cuda').find_library('Grid') if it is installed as /usr/local/lib/libGrid.a and /usr/local/include/Grid.
-Nice, let's see if it actually works.
 
 ### Stencil
 
