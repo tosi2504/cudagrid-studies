@@ -149,7 +149,6 @@ The type of l_v is indeed LatticeView<vobj> (see Lattice_bash.h > View method)
 
 #### coalescedRead (tensors/Tensor_SIMT.h)
 The definition if `GRID_SIMT` (e.g. device compilation pass of nvcc) is defined:
-
 ```
 template<class vsimd,IfSimd<vsimd> = 0> accelerator_inline
 typename vsimd::scalar_type
